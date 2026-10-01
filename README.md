@@ -33,7 +33,21 @@ Open tempo.html in a browser, or host it as a static HTML file.
 For an existing account, enter the TOTP secret provided by the service. A generated secret is not registered anywhere, so it needs to be configured with the service before its codes can be used.
 
 
-### License
-Tempo is available for non-commercial use under the Non-Commercial Software License.
+### Credits
+Tempo is based on otp-counter by Sylvain Cortes.
 
-You can use, copy, modify, and redistribute it for non-commercial purposes. Commercial use requires permission from the copyright holder.
+The original project is licensed under the MIT License. Portions of Tempo derived from that project remain available under the terms of the MIT License.
+
+Tempo also contains substantial original work and changes, including the interface, validation, storage handling, Web Crypto implementation, accessibility, countdown behavior, and other application logic.
+
+
+### License
+Tempo contains code under more than one license.
+
+Portions derived from otp-counter are licensed under the MIT License and may be used in accordance with its terms.
+
+
+Original work contributed to Tempo by trillnix is available for non-commercial use under the terms in LICENSE.
+
+
+Commercial use of the original Tempo work requires permission from trillnix.
