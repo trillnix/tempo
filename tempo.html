@@ -1,0 +1,994 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; connect-src 'none'; img-src 'none'; font-src 'none'; media-src 'none'; object-src 'none'; frame-src 'none'; worker-src 'none'; base-uri 'none'; form-action 'none'" />
+<meta name="color-scheme" content="light dark" />
+<title>tempo — offline authenticator</title>
+<style>
+  :root {
+    --bg: #f4f3ed;
+    --surface: #fbfaf6;
+    --line: #d8d9d0;
+    --ink: #21251f;
+    --muted: #626960;
+    --accent: #496c55;
+    --warn: #9a641e;
+    --critical: #a94339;
+    color-scheme: light;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg: #121511;
+      --surface: #191d18;
+      --line: #343a32;
+      --ink: #eef0e9;
+      --muted: #a1a79d;
+      --accent: #a9c9ad;
+      --warn: #e2b96f;
+      --critical: #ef9489;
+      color-scheme: dark;
+    }
+  }
+  :root[data-theme="dark"] {
+    --bg: #121511;
+    --surface: #191d18;
+    --line: #343a32;
+    --ink: #eef0e9;
+    --muted: #a1a79d;
+    --accent: #a9c9ad;
+    --warn: #e2b96f;
+    --critical: #ef9489;
+    color-scheme: dark;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; min-height: 100vh; min-height: 100dvh; padding: 48px clamp(20px, 5vw, 76px);
+    background: var(--bg); color: var(--ink);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    -webkit-font-smoothing: antialiased;
+  }
+  button, input, select { font: inherit; }
+  button:focus-visible, input:focus-visible, select:focus-visible, summary:focus-visible {
+    outline: 2px solid var(--accent); outline-offset: 4px;
+  }
+  [hidden] { display: none !important; }
+  .layout { width: 100%; max-width: 940px; margin: 0 auto; }
+  .brandline { display: flex; align-items: center; gap: 10px; width: fit-content; }
+  .brand-symbol {
+    display: grid; width: 29px; height: 29px; place-items: center; border: 1px solid var(--line); border-radius: 8px;
+    color: var(--accent); font-family: Georgia, "Times New Roman", serif; font-size: 1rem; font-style: italic;
+  }
+  .brand-name { margin: 0; color: var(--ink); font-size: 0.96rem; font-weight: 650; letter-spacing: -0.045em; }
+  .workspace { min-width: 0; }
+  .toolbar { display: grid; grid-template-columns: 1fr auto 1fr; align-items: center; gap: 18px; padding: 12px 0 18px; border-bottom: 1px solid var(--line); }
+  .toolbar-path { display: flex; align-items: center; justify-self: center; gap: 10px; min-width: 0; color: var(--muted); font-size: 0.66rem; font-weight: 650; letter-spacing: 0.12em; text-transform: uppercase; }
+  .toolbar-right { display: flex; align-items: center; justify-self: end; gap: 20px; }
+  .clock-readout { display: flex; flex-direction: column; align-items: flex-end; gap: 2px; white-space: nowrap; }
+  .clock-readout span { color: var(--muted); font-size: 0.56rem; font-weight: 650; letter-spacing: 0.12em; }
+  .clock-readout time { color: var(--ink); font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: 0.76rem; font-variant-numeric: tabular-nums; }
+  .theme-btn {
+    display: grid; place-items: center; flex: 0 0 40px; width: 40px; height: 40px; padding: 9px;
+    border: 1px solid var(--line); border-radius: 8px; background: transparent; color: var(--muted); cursor: pointer;
+    transition: color 0.15s ease, border-color 0.15s ease, background 0.15s ease;
+  }
+  .theme-btn:hover { color: var(--ink); border-color: var(--accent); background: var(--surface); }
+  .ui-icon { display: block; width: 19px; height: 19px; fill: none; stroke: currentColor; stroke-width: 1.7; stroke-linecap: round; stroke-linejoin: round; }
+  .status-band {
+    display: flex; flex-wrap: wrap; justify-content: center; align-items: center; gap: 8px 24px;
+    margin: 18px 0 22px; padding: 13px 15px; border: 1px solid var(--line); border-radius: 6px; background: var(--surface); text-align: center;
+  }
+  .status-title { display: flex; align-items: center; color: var(--accent); font-size: 0.78rem; font-weight: 750; letter-spacing: 0.14em; white-space: nowrap; }
+  .status-detail { color: var(--muted); font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: 0.59rem; font-weight: 650; letter-spacing: 0.075em; line-height: 1.5; text-align: center; }
+
+  .secret-section { display: grid; grid-template-columns: 1fr; gap: 11px; padding: 24px 0 22px; }
+  .section-heading h2 { margin: 0; font-size: 0.96rem; font-weight: 600; letter-spacing: -0.025em; }
+  .field-label-row { position: relative; display: flex; align-items: center; gap: 7px; margin-bottom: 6px; }
+  .field-label { display: block; margin: 0; color: var(--muted); font-size: 0.63rem; font-weight: 650; letter-spacing: 0.11em; text-transform: uppercase; }
+  .tooltip-wrap { position: static; display: inline-flex; align-items: center; }
+  .tooltip-trigger {
+    display: grid; place-items: center; width: 23px; height: 23px; padding: 0; border: 1px solid var(--line); border-radius: 7px;
+    background: transparent; color: var(--muted); font-family: Georgia, "Times New Roman", serif; font-size: 0.78rem; font-style: italic; cursor: help;
+  }
+  .tooltip-trigger:hover, .tooltip-trigger:focus-visible { color: var(--accent); border-color: var(--accent); }
+  .tooltip-bubble {
+    position: absolute; z-index: 5; top: calc(100% + 9px); right: 0; width: min(260px, 100%);
+    padding: 11px 13px; border: 1px solid var(--line); border-radius: 8px; background: var(--surface); color: var(--ink);
+    box-shadow: 0 12px 30px rgba(0, 0, 0, 0.12); font-size: 0.68rem; font-weight: 400; letter-spacing: 0; line-height: 1.55;
+    text-transform: none; opacity: 0; visibility: hidden; transform: translateY(4px); transition: opacity 0.15s ease, transform 0.15s ease, visibility 0.15s ease;
+  }
+  .tooltip-wrap:hover .tooltip-bubble, .tooltip-wrap:focus-within .tooltip-bubble { opacity: 1; visibility: visible; transform: translateY(0); }
+  .secret-input-row {
+    display: flex; align-items: center; gap: 8px; min-height: 43px; border-bottom: 1px solid var(--line);
+    transition: border-color 0.15s ease, box-shadow 0.15s ease;
+  }
+  .secret-input-row:focus-within { border-color: var(--accent); box-shadow: 0 1px 0 var(--accent); }
+  #totpSecret {
+    flex: 1; min-width: 0; padding: 9px 0; border: 0; outline: 0; background: transparent; color: var(--ink);
+    font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono", "Courier New", monospace;
+    font-size: 0.82rem; letter-spacing: 0.035em;
+  }
+  #totpSecret::placeholder { color: var(--muted); opacity: 0.72; }
+  #totpSecret:focus-visible { outline: 0; }
+  .icon-btn { display: grid; place-items: center; flex: 0 0 34px; width: 34px; height: 34px; padding: 0; border: 0; background: transparent; color: var(--muted); cursor: pointer; }
+  .icon-btn:hover { color: var(--accent); }
+  .secret-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 13px; }
+  .btn {
+    min-height: 34px; padding: 7px 10px; border: 1px solid var(--line); border-radius: 4px;
+    background: transparent; color: var(--muted); font-size: 0.68rem; font-weight: 600; cursor: pointer;
+    transition: color 0.15s ease, border-color 0.15s ease, background 0.15s ease;
+  }
+  .btn:not(:disabled):hover { border-color: var(--accent); color: var(--accent); }
+  .btn.primary { border-color: var(--ink); background: var(--ink); color: var(--bg); }
+  .btn.primary:not(:disabled):hover { border-color: var(--accent); background: var(--accent); color: var(--bg); }
+  button:disabled { opacity: 0.5; cursor: not-allowed; }
+  .remember { display: flex; align-items: center; gap: 8px; margin-top: 14px; color: var(--muted); font-size: 0.7rem; cursor: pointer; }
+  .remember input { width: 14px; height: 14px; margin: 0; accent-color: var(--accent); }
+  .hint { margin: 8px 0 0; color: var(--muted); font-size: 0.68rem; line-height: 1.55; overflow-wrap: anywhere; }
+  .sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; border: 0; }
+  .warning { color: var(--warn); }
+  .error { margin: 8px 0 0; color: var(--critical); font-size: 0.72rem; font-weight: 550; line-height: 1.5; overflow-wrap: anywhere; }
+  .divider { height: 1px; background: var(--line); }
+
+  .otp-display { display: grid; grid-template-columns: minmax(0, 1fr) 112px; align-items: center; gap: 20px; min-height: 164px; padding: 18px 0; animation: appear 0.22s ease-out; }
+  .otp-copy { min-width: 0; }
+  .otp-copy .kicker { display: block; margin-bottom: 10px; color: var(--accent); }
+  .code-block { display: flex; flex-wrap: wrap; justify-content: flex-start; align-items: center; gap: 12px; width: 100%; }
+  .code {
+    color: var(--ink); font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono", "Courier New", monospace;
+    font-variant-numeric: tabular-nums; font-size: clamp(2rem, 4.2vw, 3.2rem); font-weight: 550;
+    letter-spacing: 0.035em; white-space: nowrap; user-select: text;
+  }
+  .copy-btn {
+    min-height: 33px; padding: 6px 9px; border: 1px solid var(--line); border-radius: 4px;
+    background: transparent; color: var(--accent); font-size: 0.65rem; font-weight: 650; cursor: pointer; white-space: nowrap;
+    transition: border-color 0.15s ease, color 0.15s ease;
+  }
+  .copy-btn:not(:disabled):hover { border-color: var(--accent); }
+  .otp-meta { margin: 10px 0 0; color: var(--muted); font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: 0.63rem; letter-spacing: 0.025em; }
+  #copyStatus { margin-top: 7px; }
+  .timer-area { display: flex; justify-content: flex-end; }
+  .ring-wrap { position: relative; width: 104px; height: 104px; }
+  .ring { width: 100%; height: 100%; }
+  .ring-track { fill: none; stroke: var(--line); stroke-width: 5; }
+  .ring-progress { fill: none; stroke: var(--accent); stroke-width: 5; stroke-linecap: round; transition: stroke-dashoffset 0.9s linear, stroke 0.15s ease; }
+  .ring-progress.warn { stroke: var(--warn); }
+  .ring-progress.critical { stroke: var(--critical); }
+  .ring-center { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; flex-direction: column; }
+  .ring-center span { color: var(--ink); font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: 1.32rem; font-variant-numeric: tabular-nums; font-weight: 550; }
+  .ring-center small { color: var(--muted); font-size: 0.54rem; letter-spacing: 0.1em; text-transform: uppercase; text-align: center; }
+  .ring-center small.warn { color: var(--warn); font-weight: 700; }
+  .ring-center small.critical { color: var(--critical); font-weight: 700; }
+  .empty-state { display: flex; align-items: center; gap: 14px; min-height: 108px; padding: 18px 0; color: var(--muted); }
+  .empty-state .glyph { color: var(--accent); font-family: Georgia, "Times New Roman", serif; font-size: 1.35rem; }
+  .empty-state p { max-width: 38ch; margin: 0; font-size: 0.78rem; line-height: 1.55; }
+
+  details.advanced { border-top: 1px solid var(--line); padding-top: 15px; }
+  details.advanced summary { display: flex; align-items: center; gap: 8px; color: var(--muted); font-size: 0.69rem; font-weight: 600; cursor: pointer; list-style: none; }
+  details.advanced summary::-webkit-details-marker { display: none; }
+  .hint-inline { color: var(--muted); font-weight: 400; letter-spacing: 0; }
+  details.advanced summary::before { content: "+"; color: var(--accent); font-size: 0.95rem; font-weight: 400; }
+  details.advanced[open] summary::before { content: "−"; }
+  .advanced-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 14px; margin-top: 17px; }
+  .advanced-grid label { display: flex; flex-direction: column; gap: 7px; color: var(--muted); font-size: 0.65rem; font-weight: 650; letter-spacing: 0.04em; }
+  .advanced-grid select, .advanced-grid input {
+    width: 100%; min-width: 0; min-height: 38px; padding: 7px 9px; border: 1px solid var(--line); border-radius: 4px;
+    background: var(--surface); color: var(--ink); font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: 0.76rem;
+  }
+  .privacy-line { display: flex; align-items: flex-start; justify-content: center; gap: 7px; margin-top: 22px; padding-top: 14px; border-top: 1px solid var(--line); color: var(--muted); font-size: 0.66rem; line-height: 1.6; text-align: center; }
+  .privacy-bracket { flex: 0 0 auto; color: var(--accent); font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: 0.8rem; line-height: 1.35; }
+  @keyframes appear { from { opacity: 0; transform: translateY(5px); } to { opacity: 1; transform: none; } }
+  @media (max-width: 760px) {
+    body { padding: 30px clamp(18px, 5vw, 36px); }
+    .layout { max-width: 660px; }
+    .status-band { gap: 7px 18px; margin: 14px 0 18px; padding: 11px 13px; }
+    .status-title { flex-basis: 100%; justify-content: center; }
+    .secret-section { gap: 10px; padding: 22px 0 20px; }
+  }
+  @media (max-width: 500px) {
+    body { padding: 22px 17px; }
+    .toolbar { grid-template-columns: 1fr auto; gap: 10px; }
+    .toolbar-path { display: none; }
+    .toolbar-right { gap: 12px; }
+    .clock-readout span { font-size: 0.5rem; }
+    .theme-btn { flex-basis: 38px; width: 38px; height: 38px; }
+    .status-band { flex-direction: column; gap: 4px; margin: 12px 0 16px; padding: 10px 12px; }
+    .status-title { flex-basis: auto; }
+    #totpSecret::placeholder { font-size: 0.65rem; letter-spacing: 0; }
+    .otp-display { grid-template-columns: 1fr; gap: 8px; min-height: 0; padding: 18px 0; }
+    .timer-area { justify-content: flex-start; margin-top: 2px; }
+    .ring-wrap { width: 84px; height: 84px; }
+    .empty-state { min-height: 86px; }
+    .advanced-grid { grid-template-columns: repeat(auto-fit, minmax(95px, 1fr)); gap: 9px; }
+    .privacy-line { margin-top: 18px; }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after { scroll-behavior: auto !important; transition-duration: 0.01ms !important; animation-duration: 0.01ms !important; }
+  }
+</style>
+</head>
+<body>
+<main class="layout">
+  <section class="workspace" aria-label="TOTP authenticator">
+    <header class="toolbar">
+      <div class="brandline">
+        <span class="brand-symbol" aria-hidden="true">t</span>
+        <h1 class="brand-name">tempo</h1>
+      </div>
+      <div class="toolbar-path"><span>Authenticator</span><span aria-hidden="true">/</span><span>TOTP</span></div>
+      <div class="toolbar-right">
+        <div class="clock-readout" aria-label="Current device time">
+          <span>DEVICE TIME</span>
+          <time id="localClock" aria-live="off">--:--:--</time>
+        </div>
+        <button class="theme-btn" id="themeToggle" type="button" aria-label="Switch to dark mode" title="Switch to dark mode">
+          <svg class="ui-icon" id="themeSun" viewBox="0 0 24 24" aria-hidden="true" hidden><circle cx="12" cy="12" r="4"></circle><path d="M12 2v2M12 20v2M4.93 4.93l1.42 1.42M17.65 17.65l1.42 1.42M2 12h2M20 12h2M4.93 19.07l1.42-1.42M17.65 6.35l1.42-1.42"></path></svg>
+          <svg class="ui-icon" id="themeMoon" viewBox="0 0 24 24" aria-hidden="true"><path d="M20.4 15.4A8.7 8.7 0 0 1 8.6 3.6 8.8 8.8 0 1 0 20.4 15.4Z"></path></svg>
+        </button>
+      </div>
+    </header>
+
+    <aside class="status-band" aria-label="Offline and protocol details">
+      <span class="status-title">OFFLINE BY DESIGN</span>
+      <span class="status-detail">WEB CRYPTO · LOCAL ONLY</span>
+      <span class="status-detail status-protocol">RFC 6238 / TOTP</span>
+    </aside>
+
+    <section class="secret-section" aria-labelledby="secretSectionTitle">
+      <div class="section-heading">
+        <h2 id="secretSectionTitle">Secret</h2>
+      </div>
+      <div class="secret-form">
+        <div class="field-label-row">
+          <label class="field-label" for="totpSecret">TOTP secret · Base32</label>
+          <span class="tooltip-wrap">
+            <button class="tooltip-trigger" type="button" aria-label="Base32 secret format details" aria-describedby="secretFormatTooltip">i</button>
+            <span class="tooltip-bubble" id="secretFormatTooltip" role="tooltip">Use the exact key from your service. Uppercase or lowercase, spaces, and correctly padded or unpadded Base32 are accepted; malformed characters, lengths, padding, or trailing bits are rejected.</span>
+          </span>
+        </div>
+        <div class="secret-input-row">
+          <input id="totpSecret" type="password" placeholder="Enter a key or create one · e.g. JBSW…" maxlength="1024"
+            autocomplete="off" spellcheck="false" autocapitalize="off" autocorrect="off" inputmode="text"
+            aria-describedby="secretHint secretError secretWarning" aria-invalid="false" />
+          <button class="icon-btn" id="toggleVisibility" type="button" aria-label="Show secret" aria-pressed="false" title="Show secret">
+            <svg class="ui-icon" id="eyeOpen" viewBox="0 0 24 24" aria-hidden="true"><path d="M2 12s3.6-6 10-6 10 6 10 6-3.6 6-10 6S2 12 2 12Z"></path><circle cx="12" cy="12" r="3"></circle></svg>
+            <svg class="ui-icon" id="eyeClosed" viewBox="0 0 24 24" aria-hidden="true" hidden><path d="M3 3l18 18"></path><path d="M10.6 6.2A10.6 10.6 0 0 1 12 6c6.4 0 10 6 10 6a16 16 0 0 1-3.4 3.8M6.2 6.2C3.5 8 2 12 2 12s3.6 6 10 6c1.4 0 2.7-.3 3.8-.8"></path></svg>
+          </button>
+        </div>
+        <div class="secret-actions">
+          <button class="btn primary" id="generateSecretBtn" type="button">Generate secret</button>
+          <button class="btn" id="clearSecretBtn" type="button" aria-label="Clear the secret and forget any saved profile" title="Clears the secret and removes its saved profile">Clear &amp; forget</button>
+        </div>
+        <label class="remember">
+          <input type="checkbox" id="rememberSecret" aria-describedby="privacyNote storageStatus" />
+          Remember this secret on this device
+        </label>
+        <p class="hint" id="storageStatus" role="status" hidden></p>
+        <p class="hint" id="secretHint">A generated secret only works after you register it with the service.</p>
+        <p class="hint warning" id="secretWarning" hidden></p>
+        <p class="error" id="secretError" role="alert" hidden></p>
+        <p class="error" id="environmentError" role="alert" hidden></p>
+      </div>
+    </section>
+
+    <div class="divider" aria-hidden="true"></div>
+
+    <div class="otp-display" id="otpDisplay" aria-busy="false" hidden>
+      <div class="otp-copy">
+        <span class="kicker">Current code</span>
+        <div class="code-block">
+          <div class="code" id="otpCode" aria-live="off">--- ---</div>
+          <button class="copy-btn" id="copyBtn" type="button" disabled>Copy</button>
+        </div>
+        <p class="otp-meta" id="otpMeta">SHA-1 · 6 digits · 30s period</p>
+        <p class="hint" id="copyStatus" role="status" hidden></p>
+        <p class="sr-only" id="otpAnnouncement" role="status" aria-live="polite" aria-atomic="true" hidden></p>
+      </div>
+      <div class="timer-area">
+        <div class="ring-wrap" id="ringWrap" role="timer" aria-live="off" aria-atomic="true" aria-label="30 seconds remaining">
+          <svg class="ring" viewBox="0 0 120 120" aria-hidden="true">
+            <path class="ring-track" d="M 60 10 H 88 A 22 22 0 0 1 110 32 V 88 A 22 22 0 0 1 88 110 H 32 A 22 22 0 0 1 10 88 V 32 A 22 22 0 0 1 32 10 H 60"></path>
+            <path class="ring-progress" id="ringProgress" d="M 60 10 H 88 A 22 22 0 0 1 110 32 V 88 A 22 22 0 0 1 88 110 H 32 A 22 22 0 0 1 10 88 V 32 A 22 22 0 0 1 32 10 H 60"></path>
+          </svg>
+          <div class="ring-center">
+            <span id="secondsLeft">30</span>
+            <small id="countdownLabel">seconds left</small>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="empty-state" id="emptyState">
+      <span class="glyph" aria-hidden="true">—</span>
+      <p id="emptyMessage">Enter or generate a secret to see the current code.</p>
+    </div>
+    <p class="error" id="runtimeError" role="alert" hidden></p>
+
+    <details class="advanced" id="advancedOptions">
+      <summary>Advanced options <span class="hint-inline">— match your service settings</span></summary>
+      <div class="advanced-grid">
+        <label for="algoSelect">Algorithm
+          <select id="algoSelect">
+            <option value="SHA-1" selected>SHA-1</option>
+            <option value="SHA-256">SHA-256</option>
+            <option value="SHA-512">SHA-512</option>
+          </select>
+        </label>
+        <label for="digitsSelect">Digits
+          <select id="digitsSelect">
+            <option value="6" selected>6</option>
+            <option value="8">8</option>
+          </select>
+        </label>
+        <label for="periodInput">Period · seconds
+          <input type="number" id="periodInput" value="30" min="10" max="120" step="1" required
+            aria-describedby="periodHint settingsError" aria-invalid="false" />
+        </label>
+      </div>
+      <p class="hint" id="periodHint">Whole seconds, 10–120. Match these settings to your service.</p>
+      <p class="error" id="settingsError" role="alert" hidden></p>
+    </details>
+
+    <footer class="privacy-line">
+      <span class="privacy-bracket" aria-hidden="true">[</span>
+      <span id="privacyNote">Remembered secrets and settings are stored unencrypted in this browser profile; avoid saving them on shared devices. Keep your device clock accurate.</span>
+      <span class="privacy-bracket" aria-hidden="true">]</span>
+    </footer>
+    <noscript><p class="error">Enable JavaScript to calculate TOTP codes.</p></noscript>
+  </section>
+</main>
+
+<script>
+(function () {
+  "use strict";
+
+  const B32_ALPHABET = "ABCDEFGHIJKLMNOPQRSTUVWXYZ234567";
+  const HASH_ALGORITHMS = new Set(["SHA-1", "SHA-256", "SHA-512"]);
+  const GENERATED_SECRET_BYTES = 20;
+  const STORAGE_KEY = "otp_counter_profile_v1";
+  const LEGACY_STORAGE_KEY = "totp_secret";
+  const RING_CIRCUMFERENCE = 4 * (100 - 2 * 22) + 2 * Math.PI * 22;
+  let webCrypto = null;
+  let secureRandomAvailable = false;
+  let hmacAvailable = false;
+  try {
+    webCrypto = window.crypto || null;
+    secureRandomAvailable = !!(webCrypto && typeof webCrypto.getRandomValues === "function");
+    const subtle = webCrypto && webCrypto.subtle;
+    hmacAvailable = !!(subtle && typeof subtle.importKey === "function" && typeof subtle.sign === "function");
+  } catch { /* Some local-file contexts restrict Web Crypto entirely. */ }
+
+  const els = {};
+  ["totpSecret", "toggleVisibility", "eyeOpen", "eyeClosed", "generateSecretBtn", "clearSecretBtn", "rememberSecret", "themeToggle", "themeSun", "themeMoon", "localClock",
+    "storageStatus", "secretHint", "secretWarning", "secretError", "environmentError",
+    "otpDisplay", "emptyState", "emptyMessage", "ringWrap", "ringProgress", "secondsLeft", "countdownLabel", "otpCode",
+    "otpMeta", "copyBtn", "copyStatus", "otpAnnouncement", "runtimeError", "algoSelect", "digitsSelect",
+    "periodInput", "settingsError", "advancedOptions"].forEach(function (id) {
+      els[id] = document.getElementById(id);
+    });
+
+  const state = {
+    active: null,
+    validProfile: null,
+    copyRequestId: 0,
+    copyBusy: false,
+    copyTimer: null
+  };
+
+  // RFC 4648: accept padded or unpadded Base32, but never discard bad characters,
+  // invalid encoded lengths, or nonzero trailing padding bits.
+  function base32Decode(input) {
+    const cleaned = input.replace(/\s+/g, "").toUpperCase();
+    if (!cleaned) return new Uint8Array(0);
+    if (cleaned.length > 1024) throw new Error("Secret is too long (maximum 1,024 characters).");
+    const match = /^([A-Z2-7]+)(={0,6})$/.exec(cleaned);
+    if (!match) throw new Error("Use only A–Z, 2–7, spaces, and optional trailing Base32 padding (=).");
+
+    const data = match[1];
+    const padding = match[2].length;
+    const expectedPadding = { 0: 0, 2: 6, 4: 4, 5: 3, 7: 1 }[data.length % 8];
+    if (expectedPadding === undefined) throw new Error("Invalid Base32 length. Check that the complete secret was pasted.");
+    if (padding && padding !== expectedPadding) throw new Error("Invalid Base32 padding. Use the exact trailing = padding or omit it entirely.");
+
+    let buffer = 0;
+    let bits = 0;
+    const bytes = [];
+    for (const character of data) {
+      buffer = (buffer << 5) | B32_ALPHABET.indexOf(character);
+      bits += 5;
+      if (bits >= 8) {
+        bits -= 8;
+        bytes.push((buffer >>> bits) & 255);
+        buffer &= (1 << bits) - 1;
+      }
+    }
+    if (buffer !== 0) throw new Error("Invalid Base32 trailing bits. Check the last character of the secret.");
+    return new Uint8Array(bytes);
+  }
+
+  function base32Encode(bytes) {
+    let buffer = 0;
+    let bits = 0;
+    let result = "";
+    for (const byte of bytes) {
+      buffer = (buffer << 8) | byte;
+      bits += 8;
+      while (bits >= 5) {
+        bits -= 5;
+        result += B32_ALPHABET[(buffer >>> bits) & 31];
+      }
+      buffer &= (1 << bits) - 1;
+    }
+    if (bits) result += B32_ALPHABET[(buffer << (5 - bits)) & 31];
+    return result;
+  }
+
+  function formatGroups(text, size) {
+    const groups = [];
+    for (let i = 0; i < text.length; i += size) groups.push(text.slice(i, i + size));
+    return groups.join(" ");
+  }
+
+  function validateSettings(algorithm, digits, period) {
+    if (!HASH_ALGORITHMS.has(algorithm)) {
+      throw new Error("Select SHA-1, SHA-256, or SHA-512.");
+    }
+    const digitCount = Number(digits);
+    if (digitCount !== 6 && digitCount !== 8) throw new Error("Select 6 or 8 digits.");
+    const periodSeconds = Number(period);
+    if (!Number.isInteger(periodSeconds) || periodSeconds < 10 || periodSeconds > 120) {
+      throw new Error("Period must be a whole number from 10 to 120 seconds.");
+    }
+    return { algorithm: algorithm, digits: digitCount, period: periodSeconds };
+  }
+
+  function importHmacKey(bytes, algorithm) {
+    return webCrypto.subtle.importKey("raw", bytes, { name: "HMAC", hash: algorithm }, false, ["sign"]);
+  }
+
+  async function computeTOTP(key, counter, digits) {
+    if (!Number.isSafeInteger(counter) || counter < 0) throw new Error("Invalid TOTP time counter.");
+    const buffer = new ArrayBuffer(8);
+    const view = new DataView(buffer);
+    view.setUint32(0, Math.floor(counter / 4294967296), false);
+    view.setUint32(4, counter % 4294967296, false);
+    const signature = await webCrypto.subtle.sign("HMAC", key, buffer);
+    const hash = new Uint8Array(signature);
+    const offset = hash[hash.length - 1] & 15;
+    const binary =
+      ((hash[offset] & 127) << 24) |
+      ((hash[offset + 1] & 255) << 16) |
+      ((hash[offset + 2] & 255) << 8) |
+      (hash[offset + 3] & 255);
+    return (binary % (10 ** digits)).toString().padStart(digits, "0");
+  }
+
+  function showMessage(element, message) {
+    element.hidden = !message;
+    if (element.textContent !== message) element.textContent = message;
+  }
+
+  function setHidden(element, hidden) {
+    if (hidden) element.setAttribute("hidden", "");
+    else element.removeAttribute("hidden");
+  }
+
+  function currentCounter(period) {
+    return Math.floor(Date.now() / (period * 1000));
+  }
+
+  function resetCopyUI() {
+    state.copyRequestId += 1;
+    state.copyBusy = false;
+    clearTimeout(state.copyTimer);
+    state.copyTimer = null;
+    els.copyBtn.textContent = "Copy";
+    els.copyBtn.disabled = true;
+    showMessage(els.copyStatus, "");
+  }
+
+  function resetCodeUI(digits) {
+    els.otpCode.textContent = formatGroups("-".repeat(digits || 6), (digits || 6) / 2);
+    showMessage(els.otpAnnouncement, "");
+    resetCopyUI();
+  }
+
+  function deactivate() {
+    state.active = null; // In-flight jobs must check this identity before publishing.
+    resetCodeUI(6);
+    els.otpDisplay.hidden = true;
+    els.otpDisplay.setAttribute("aria-busy", "false");
+    els.emptyState.hidden = false;
+    showMessage(els.runtimeError, "");
+  }
+
+  function validateAndSync(persist) {
+    showMessage(els.secretError, "");
+    showMessage(els.settingsError, "");
+    showMessage(els.secretWarning, "");
+    els.totpSecret.setAttribute("aria-invalid", "false");
+    els.periodInput.setAttribute("aria-invalid", "false");
+
+    let settings = null;
+    let bytes = null;
+    try {
+      settings = validateSettings(els.algoSelect.value, els.digitsSelect.value, els.periodInput.value);
+    } catch (error) {
+      showMessage(els.settingsError, error.message);
+      els.periodInput.setAttribute("aria-invalid", "true");
+      els.advancedOptions.open = true;
+    }
+
+    if (els.totpSecret.value.trim()) {
+      try {
+        bytes = base32Decode(els.totpSecret.value);
+        // Any nonempty key is usable by HMAC; warn, rather than reject, short legacy keys.
+        if (bytes.length === 0) throw new Error("Secret must decode to at least one byte.");
+        if (bytes.length < 16) {
+          showMessage(els.secretWarning, "This is a short key. For new setups, use at least 128 random bits. For existing accounts, keep the exact secret supplied by the provider.");
+        }
+      } catch (error) {
+        bytes = null;
+        showMessage(els.secretError, error.message);
+        els.totpSecret.setAttribute("aria-invalid", "true");
+      }
+    }
+
+    if (!bytes || !settings) {
+      state.validProfile = null;
+      deactivate();
+      els.emptyMessage.textContent = (!els.secretError.hidden || !els.settingsError.hidden)
+        ? "Fix the secret or options above to resume generating codes."
+        : "Enter or generate a TOTP secret above to see the live OTP code.";
+    } else {
+      const canonicalSecret = base32Encode(bytes);
+      const profile = {
+        secret: canonicalSecret,
+        algorithm: settings.algorithm,
+        digits: settings.digits,
+        period: settings.period
+      };
+      state.validProfile = profile;
+      if (!hmacAvailable) {
+        deactivate();
+        els.emptyMessage.textContent = "This browser context cannot calculate TOTP without Web Crypto HMAC.";
+      } else {
+        const fingerprint = [canonicalSecret, settings.algorithm, settings.digits, settings.period].join("|");
+        if (!state.active || state.active.fingerprint !== fingerprint) {
+          state.active = {
+            fingerprint: fingerprint,
+            secret: canonicalSecret,
+            secretBytes: bytes,
+            algorithm: settings.algorithm,
+            digits: settings.digits,
+            period: settings.period,
+            keyPromise: null,
+            pending: null,
+            currentCode: "",
+            codeCounter: null,
+            errorCounter: null,
+            retryAt: 0
+          };
+          resetCodeUI(settings.digits);
+          showMessage(els.runtimeError, "");
+        }
+        els.otpDisplay.hidden = false;
+        els.emptyState.hidden = true;
+        els.otpMeta.textContent = settings.algorithm + " · " + settings.digits + " digits · " + settings.period + "s period";
+        tick();
+      }
+    }
+    if (persist === true) persistIfRemembered();
+    else if (persist === false && els.rememberSecret.checked) {
+      storageMessage("Editing is not saved until the profile is valid and editing is finished. Any previously saved profile is kept.", false);
+    }
+  }
+
+  function handlePeriodInput(finalize) {
+    const period = Number(els.periodInput.value);
+    if (Number.isInteger(period) && period >= 10 && period <= 120) {
+      validateAndSync(finalize);
+      return;
+    }
+    if (finalize) {
+      validateAndSync(false);
+      return;
+    }
+
+    // Hide the old code immediately, but defer the validation message while the user edits.
+    showMessage(els.settingsError, "");
+    els.periodInput.setAttribute("aria-invalid", "false");
+    state.validProfile = null;
+    deactivate();
+    els.emptyMessage.textContent = els.totpSecret.value.trim()
+      ? "Finish entering a whole-number period from 10 to 120 seconds to generate codes."
+      : "Enter or generate a TOTP secret above to see the live OTP code.";
+    if (els.rememberSecret.checked) {
+      storageMessage("Editing is not saved until the profile is valid and editing is finished. Any previously saved profile is kept.", false);
+    }
+    // Keep any saved profile untouched while a period is temporarily incomplete.
+  }
+
+  function updateCountdown(context, now) {
+    const periodMs = context.period * 1000;
+    const elapsedMs = ((now % periodMs) + periodMs) % periodMs;
+    const remainingMs = periodMs - elapsedMs;
+    const seconds = Math.ceil(remainingMs / 1000);
+    const fraction = remainingMs / periodMs;
+    const urgency = seconds <= 3 ? "critical" : (seconds <= 8 ? "warn" : "");
+    const spokenState = urgency === "critical" ? "Critical" : (urgency === "warn" ? "Warning" : "seconds left");
+    els.ringProgress.style.strokeDashoffset = (RING_CIRCUMFERENCE * (1 - fraction)).toFixed(2);
+    if (els.secondsLeft.textContent !== String(seconds)) els.secondsLeft.textContent = seconds;
+    els.ringProgress.classList.toggle("critical", urgency === "critical");
+    els.ringProgress.classList.toggle("warn", urgency === "warn");
+    els.countdownLabel.className = urgency;
+    if (els.countdownLabel.textContent !== spokenState) els.countdownLabel.textContent = spokenState;
+    els.ringWrap.setAttribute("aria-label", seconds + " second" + (seconds === 1 ? "" : "s") + " remaining; " + spokenState.toLowerCase() + ".");
+  }
+
+  function updateCopyEnabled() {
+    const context = state.active;
+    els.copyBtn.disabled = !context || !context.currentCode ||
+      context.codeCounter !== currentCounter(context.period) || state.copyBusy;
+  }
+
+  function requestCode(context, counter) {
+    const request = { counter: counter };
+    context.pending = request;
+    context.currentCode = "";
+    context.codeCounter = null;
+    resetCodeUI(context.digits);
+    els.otpDisplay.setAttribute("aria-busy", "true");
+
+    (async function () {
+      try {
+        // Import once per validated configuration, not on every countdown tick.
+        if (!context.keyPromise) context.keyPromise = importHmacKey(context.secretBytes, context.algorithm);
+        const key = await context.keyPromise;
+        if (state.active !== context || context.pending !== request) return;
+        const code = await computeTOTP(key, counter, context.digits);
+        if (state.active !== context || context.pending !== request) return;
+
+        // Even a valid request can finish after its time step has expired.
+        if (currentCounter(context.period) !== counter) {
+          context.pending = null;
+          tick();
+          return;
+        }
+        context.currentCode = code;
+        context.codeCounter = counter;
+        context.errorCounter = null;
+        context.retryAt = 0;
+        els.otpCode.textContent = formatGroups(code, context.digits / 2);
+        showMessage(els.otpAnnouncement, "New one-time code: " + formatGroups(code, context.digits / 2));
+        els.otpDisplay.setAttribute("aria-busy", "false");
+        showMessage(els.runtimeError, "");
+        updateCopyEnabled();
+      } catch {
+        if (state.active !== context || context.pending !== request) return;
+        // Do not mark a failed counter as successfully computed. Allow a retry.
+        context.keyPromise = null;
+        context.errorCounter = counter;
+        context.retryAt = Date.now() + 1000;
+        els.otpDisplay.setAttribute("aria-busy", "false");
+        showMessage(els.runtimeError, "Web Crypto could not calculate an OTP. Some browsers restrict it for local files; no network fallback is used. Retrying shortly.");
+        updateCopyEnabled();
+      } finally {
+        // An old job must never unlock or overwrite a newer one.
+        if (context.pending === request) context.pending = null;
+      }
+    })();
+  }
+
+  function tick() {
+    const context = state.active;
+    if (!context) return;
+    const now = Date.now();
+    const counter = Math.floor(now / (context.period * 1000));
+    updateCountdown(context, now);
+    updateCopyEnabled();
+    if (context.currentCode && context.codeCounter === counter) return;
+    if (context.pending && context.pending.counter === counter) return;
+    if (context.errorCounter === counter && now < context.retryAt) return;
+    requestCode(context, counter);
+  }
+
+  function updateClock() {
+    const now = Date.now();
+    const date = new Date(now);
+    els.localClock.dateTime = date.toISOString();
+    els.localClock.textContent = date.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit" });
+  }
+
+  function scheduleTick() {
+    updateClock();
+    tick();
+    // Align updates to wall-clock seconds; background/focus events also refresh immediately.
+    setTimeout(scheduleTick, 1000 - (Date.now() % 1000) + 5);
+  }
+
+  function storageMessage(message, failed) {
+    els.storageStatus.className = failed ? "error" : "hint";
+    showMessage(els.storageStatus, message);
+  }
+
+  function forgetStoredProfile(successMessage) {
+    let success = true;
+    [STORAGE_KEY, LEGACY_STORAGE_KEY].forEach(function (key) {
+      try { localStorage.removeItem(key); } catch { success = false; }
+    });
+    if (successMessage) {
+      storageMessage(success ? successMessage : "Could not remove saved data. Clear this page's storage in your browser settings.", !success);
+    }
+    return success;
+  }
+
+  function persistIfRemembered() {
+    if (!els.rememberSecret.checked) return;
+    if (!state.validProfile) {
+      storageMessage("Not saved yet: finish entering a valid secret and settings. Any previously saved profile is left unchanged.", false);
+      return;
+    }
+
+    const profile = { version: 1, ...state.validProfile };
+    try {
+      // setItem replaces one complete profile atomically; never delete the old one on failure.
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(profile));
+    } catch {
+      storageMessage("Could not save the updated profile. Existing saved data was not removed; check browser storage.", true);
+      return;
+    }
+
+    let legacyRemoved = true;
+    try { localStorage.removeItem(LEGACY_STORAGE_KEY); } catch { legacyRemoved = false; }
+    storageMessage(
+      legacyRemoved
+        ? "Remembered in this browser profile. Local storage is not encrypted."
+        : "Profile saved, but an older saved entry could not be removed.",
+      !legacyRemoved
+    );
+  }
+
+  function restoreProfile() {
+    let saved;
+    let legacy;
+    try {
+      saved = localStorage.getItem(STORAGE_KEY);
+      legacy = localStorage.getItem(LEGACY_STORAGE_KEY);
+    } catch {
+      storageMessage("Browser storage is unavailable. This page can still work in memory, but saved data cannot be checked or changed.", true);
+      return;
+    }
+
+    if (saved !== null) {
+      try {
+        const profile = JSON.parse(saved);
+        if (!profile || profile.version !== 1 || typeof profile.secret !== "string") throw new Error();
+        const settings = validateSettings(profile.algorithm, profile.digits, profile.period);
+        const bytes = base32Decode(profile.secret);
+        if (!bytes.length) throw new Error();
+        els.totpSecret.value = formatGroups(base32Encode(bytes), 4);
+        els.algoSelect.value = settings.algorithm;
+        els.digitsSelect.value = String(settings.digits);
+        els.periodInput.value = String(settings.period);
+        els.rememberSecret.checked = true;
+        if (legacy === null) storageMessage("Remembered in this browser profile. Local storage is not encrypted.", false);
+        if (legacy !== null) {
+          try { localStorage.removeItem(LEGACY_STORAGE_KEY); }
+          catch { storageMessage("Profile restored, but an older saved entry could not be removed.", true); }
+        }
+      } catch {
+        const removed = forgetStoredProfile(false);
+        storageMessage(
+          removed ? "Invalid saved data was ignored and removed." : "Invalid saved data was ignored but could not be removed. Clear this page's storage.",
+          true
+        );
+      }
+      return;
+    }
+
+    if (legacy === null) return;
+    let bytes;
+    try {
+      bytes = base32Decode(legacy);
+      if (!bytes.length) throw new Error();
+    } catch {
+      const removed = forgetStoredProfile(false);
+      storageMessage(
+        removed ? "Invalid older saved data was ignored and removed." : "Invalid older saved data could not be removed. Clear this page's storage.",
+        true
+      );
+      return;
+    }
+
+    const profile = {
+      version: 1,
+      secret: base32Encode(bytes),
+      algorithm: "SHA-1",
+      digits: 6,
+      period: 30
+    };
+    els.totpSecret.value = formatGroups(profile.secret, 4);
+    els.rememberSecret.checked = true;
+    try {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(profile));
+      try {
+        localStorage.removeItem(LEGACY_STORAGE_KEY);
+        storageMessage("Older saved secret migrated. Local storage is not encrypted.", false);
+      } catch {
+        storageMessage("Secret migrated, but the older saved entry could not be removed.", true);
+      }
+    } catch {
+      // Keep the valid legacy entry if the versioned replacement cannot be written.
+      storageMessage("Could not migrate the saved secret; the older saved entry was left in place.", true);
+    }
+  }
+
+  function generateRandomSecret() {
+    if (!secureRandomAvailable) return;
+    let bytes;
+    try {
+      // Use a fixed 160-bit key for every HMAC algorithm; never use Math.random().
+      bytes = new Uint8Array(GENERATED_SECRET_BYTES);
+      webCrypto.getRandomValues(bytes);
+      els.totpSecret.value = formatGroups(base32Encode(bytes), 4);
+      bytes.fill(0);
+      validateAndSync(true);
+    } catch {
+      if (bytes) bytes.fill(0);
+      showMessage(els.runtimeError, "Could not generate a random secret with this browser's Web Crypto support.");
+    }
+  }
+
+  // Legacy fallback only succeeds if execCommand actually reports success.
+  function fallbackCopy(code) {
+    const textarea = document.createElement("textarea");
+    const previousFocus = document.activeElement;
+    textarea.value = code;
+    textarea.readOnly = true;
+    textarea.style.cssText = "position:fixed;left:-10000px;top:0;opacity:0;";
+    document.body.appendChild(textarea);
+    let copied = false;
+    try {
+      textarea.focus();
+      textarea.select();
+      copied = typeof document.execCommand === "function" && document.execCommand("copy") === true;
+    } catch {
+      copied = false;
+    } finally {
+      if (textarea.parentNode) textarea.parentNode.removeChild(textarea);
+      if (previousFocus && typeof previousFocus.focus === "function") {
+        try { previousFocus.focus(); } catch { /* Focus restoration is best effort. */ }
+      }
+    }
+    return copied;
+  }
+
+  async function copyCode() {
+    const context = state.active;
+    if (!context || !context.currentCode || context.codeCounter !== currentCounter(context.period)) {
+      tick();
+      showMessage(els.copyStatus, "The code is refreshing. Copy it once the new code appears.");
+      return;
+    }
+    if (state.copyBusy) return;
+    const code = context.currentCode;
+    const counter = context.codeCounter;
+    const requestId = ++state.copyRequestId;
+    clearTimeout(state.copyTimer);
+    state.copyBusy = true;
+    updateCopyEnabled();
+    let copied = false;
+    try {
+      if (navigator.clipboard && typeof navigator.clipboard.writeText === "function") {
+        await navigator.clipboard.writeText(code);
+        copied = true;
+      }
+    } catch (error) {
+      // Some browsers deny Clipboard API access but still allow the fallback.
+    }
+    if (!copied && state.active === context && currentCounter(context.period) === counter) {
+      copied = fallbackCopy(code);
+    }
+    if (requestId !== state.copyRequestId) return;
+    state.copyBusy = false;
+    if (state.active !== context || currentCounter(context.period) !== counter) {
+      tick();
+      return;
+    }
+    els.copyBtn.textContent = copied ? "Copied!" : "Failed";
+    showMessage(els.copyStatus, copied ? "Code copied." : "Could not copy. Select the displayed code and copy it manually.");
+    updateCopyEnabled();
+    state.copyTimer = setTimeout(function () {
+      if (requestId !== state.copyRequestId) return;
+      els.copyBtn.textContent = "Copy";
+      showMessage(els.copyStatus, "");
+      state.copyTimer = null;
+    }, 1400);
+  }
+
+  function setSecretVisibility(showing) {
+    els.totpSecret.type = showing ? "text" : "password";
+    els.toggleVisibility.setAttribute("aria-pressed", String(showing));
+    els.toggleVisibility.setAttribute("aria-label", showing ? "Hide secret" : "Show secret");
+    els.toggleVisibility.title = showing ? "Hide secret" : "Show secret";
+    setHidden(els.eyeOpen, showing);
+    setHidden(els.eyeClosed, !showing);
+  }
+
+  function currentTheme() {
+    const forced = document.documentElement.getAttribute("data-theme");
+    if (forced === "light" || forced === "dark") return forced;
+    return window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
+  }
+
+  function updateThemeButton() {
+    const nextTheme = currentTheme() === "dark" ? "light" : "dark";
+    const label = "Switch to " + nextTheme + " mode";
+    els.themeToggle.setAttribute("aria-label", label);
+    els.themeToggle.title = label;
+    setHidden(els.themeSun, nextTheme !== "light");
+    setHidden(els.themeMoon, nextTheme !== "dark");
+  }
+
+  const themeMedia = typeof window.matchMedia === "function"
+    ? window.matchMedia("(prefers-color-scheme: dark)")
+    : null;
+  function updateThemeOnSystemChange() {
+    if (!document.documentElement.hasAttribute("data-theme")) updateThemeButton();
+  }
+  if (themeMedia) {
+    if (typeof themeMedia.addEventListener === "function") themeMedia.addEventListener("change", updateThemeOnSystemChange);
+    else if (typeof themeMedia.addListener === "function") themeMedia.addListener(updateThemeOnSystemChange);
+  }
+  els.themeToggle.addEventListener("click", function () {
+    document.documentElement.setAttribute("data-theme", currentTheme() === "dark" ? "light" : "dark");
+    updateThemeButton();
+  });
+  updateThemeButton();
+
+  els.totpSecret.addEventListener("input", function () { validateAndSync(false); });
+  els.totpSecret.addEventListener("change", function () { validateAndSync(true); });
+  els.toggleVisibility.addEventListener("click", function () {
+    setSecretVisibility(els.totpSecret.type !== "text");
+  });
+  els.generateSecretBtn.addEventListener("click", generateRandomSecret);
+  els.clearSecretBtn.addEventListener("click", function () {
+    els.totpSecret.value = "";
+    els.rememberSecret.checked = false;
+    setSecretVisibility(false);
+    forgetStoredProfile("Secret cleared and remembered profile removed.");
+    validateAndSync(false);
+  });
+  els.rememberSecret.addEventListener("change", function () {
+    if (els.rememberSecret.checked) persistIfRemembered();
+    else forgetStoredProfile("Remembering is off; saved profile removed.");
+  });
+  [els.algoSelect, els.digitsSelect].forEach(function (element) {
+    element.addEventListener("change", function () { validateAndSync(true); });
+  });
+  els.periodInput.addEventListener("input", function () { handlePeriodInput(false); });
+  els.periodInput.addEventListener("change", function () { handlePeriodInput(true); });
+  els.copyBtn.addEventListener("click", copyCode);
+
+  els.ringProgress.style.strokeDasharray = RING_CIRCUMFERENCE.toFixed(2);
+  if (!secureRandomAvailable) els.generateSecretBtn.disabled = true;
+  if (!hmacAvailable) {
+    const cryptoMessage = window.location.protocol === "file:"
+      ? "Web Crypto HMAC is unavailable for this local file in this browser. Some browsers restrict it for file://; use a browser that permits local Web Crypto. No network fallback is used."
+      : "Web Crypto HMAC is unavailable in this browser context. TOTP requires the built-in API; no network fallback is used.";
+    showMessage(els.environmentError, cryptoMessage);
+  } else if (!secureRandomAvailable) {
+    showMessage(els.environmentError, "Secure random-secret generation is unavailable. You can still calculate codes for an existing secret.");
+  }
+  restoreProfile();
+  validateAndSync();
+  scheduleTick();
+  // Timers can be throttled in background tabs; refresh immediately on return.
+  document.addEventListener("visibilitychange", function () { if (!document.hidden) { updateClock(); tick(); } });
+  window.addEventListener("focus", function () { updateClock(); tick(); });
+  window.addEventListener("pageshow", function () { updateClock(); tick(); });
+})();
+</script>
+</body>
+</html>
