@@ -1,34 +1,46 @@
-NON-COMMERCIAL SOFTWARE LICENSE
+TEMPO LICENSE
 Copyright (c) 2026 trillnix
 
-Permission is granted, free of charge, to any person obtaining a copy of this software and associated files (the "Software"), to use, copy, modify, and redistribute the Software, subject to the following conditions:
+Tempo contains portions derived from:
 
-NON-COMMERCIAL USE
-The Software may be used, copied, modified, and redistributed only for non-commercial purposes.
-You may not:
+otp-counter
+Copyright (c) Sylvain Cortes
+https://github.com/sylvaincortes/otp-counter
 
-sell the Software or any copy, modified version, or derivative work;
-use the Software as part of a commercial product or service;
-use the Software to provide a paid or monetized service;
-otherwise use the Software primarily for commercial advantage or monetary compensation.
-REDISTRIBUTION
-You may redistribute the original or modified Software, provided that:
-this license is included with the Software;
-the original copyright notice is retained;
-reasonable attribution to the original author is maintained; and
-the recipient is informed that the Software is subject to this license.
-MODIFICATIONS
-You are free to modify the Software and create derivative works for non-commercial purposes.
-Modified versions must not be presented as the original work or imply endorsement by the original author without permission.
+Those portions are provided under the MIT License reproduced below.
 
-COMMERCIAL PERMISSION
-Commercial use is not permitted under this license.
-If you wish to use the Software commercially, including selling it, incorporating it into a commercial product or service, or using it to provide a paid service, you must obtain separate written permission from the copyright holder.
+MIT License
 
-NO WARRANTY
-THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE, AND NONINFRINGEMENT.
-IN NO EVENT SHALL THE COPYRIGHT HOLDER BE LIABLE FOR ANY CLAIM, DAMAGES, OR OTHER LIABILITY ARISING FROM, OUT OF, OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+Copyright (c) Sylvain Cortes
 
-NO TRADEMARK LICENSE
-This license does not grant permission to use any trademarks, logos, names, or branding associated with the original author or project, except as reasonably necessary to identify the Software.
-This is a custom license and is not an OSI-approved open-source license.
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
+
+TEMPO ORIGINAL WORK
+
+Except for the portions derived from otp-counter and covered by the MIT License above, original work contributed to Tempo by trillnix is provided under the following terms:
+
+Permission is granted to use, copy, modify, and redistribute the original work for non-commercial purposes, provided that this license and the copyright notice are retained.
+
+Commercial use of the original work is not permitted without prior written permission from the copyright holder.
+
+The original work may not be sold, sublicensed for commercial use, or incorporated into a commercial product or service without prior written permission from the copyright holder.
+
+Modified versions of the original work must not imply endorsement by the copyright holder.
+
+THE ORIGINAL WORK IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE COPYRIGHT HOLDER BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY ARISING FROM, OUT OF, OR IN CONNECTION WITH THE ORIGINAL WORK OR ITS USE.
